@@ -10,13 +10,15 @@ namespace PasswordGenerator
 	public sealed class Parser
 	{
 		Selector<Selector<char>> selectors = new Selector<Selector<char>>();
-		SelectLowerCons lowCon = new SelectLowerCons();
-		SelectLowerVowels lowVow = new SelectLowerVowels();
-		SelectUpperCons uppCon = new SelectUpperCons();
-		SelectUpperVowels uppVow = new SelectUpperVowels();
-		SelectNumbers number = new SelectNumbers();
-		SelectSpecials speshl = new SelectSpecials();
-		
+		Selector<char> lowCon = new SelectLowerCons();
+		Selector<char> lowVow = new SelectLowerVowels();
+		Selector<char> uppCon = new SelectUpperCons();
+		Selector<char> uppVow = new SelectUpperVowels();
+		Selector<char> number = new SelectNumbers();
+		Selector<char> speshl = new SelectSpecials();
+
+		private static Random entropy = new Random();
+
 		private static readonly Parser instance = new Parser();
 		public static Parser Instance { get { return instance; } }
 
@@ -38,7 +40,9 @@ namespace PasswordGenerator
 			//pattern = "cv(c)\\10c\\1v(c)\\2";
 
 			string result = pattern;
-			
+
+			result = Alternation(result);
+
 			result = CharReplace(result, length);
 
 			result = ReplaceLiterals(result);
@@ -46,7 +50,35 @@ namespace PasswordGenerator
 			result = GenerateDoubles(result);
 
 			try { result = result.Remove(length); }
-			catch (Exception e) { }
+			catch (Exception) { }
+
+			return result;
+		}
+
+		/// <summary>
+		/// Allows for OR-type alternation
+		/// </summary>
+		private string Alternation(string input)
+		{
+			string result = input;
+			string value1, value2;
+			string[] parts;
+
+			Match matches = Regex.Match(result, @"(?:(?:[\[\(].[\]\)])|.)\|(?:(?:[\[\(].[\]\)])|.)");
+
+			while (matches.Success)
+			{
+				Capture cap = matches.Captures[0];
+				value1 = Regex.Match(cap.Value, @".+(?=\|)").Value;
+				value2 = Regex.Match(cap.Value, @"(?<=\|).+").Value;
+
+				// [a]|cv|[x](c)\1$cvcc
+
+				parts = result.Split(new[] {cap.Value}, StringSplitOptions.None);
+				result = parts[0] + (entropy.Next(2) == 1 ? value1 : value2) + parts[1];
+
+				matches = matches.NextMatch();
+			}
 
 			return result;
 		}
@@ -68,7 +100,6 @@ namespace PasswordGenerator
 				matches = matches.NextMatch();
 			}
 
-			int i = 1;
 			foreach (char c in store)
 			{
 				string s = c.ToString();
@@ -86,16 +117,18 @@ namespace PasswordGenerator
 		{
 			string result = "";
 			string pad = "";
-			int index = 0;
+			int literalCount = 0;
 
-			while (index < length)
+			if (pattern.Length == 0) pattern = "r";
+
+			while (literalCount < length)
 			{
 				bool bSkip = false;
 
 				foreach (char c in pattern)
 				{
 					// creates a 3-size string to check for various bracket types
-					pad = Cycle(pad, c);
+					pad = CreateCycle(pad, c);
 
 					// does not count slash characters against length limit
 					if (c == '\\')
@@ -105,7 +138,7 @@ namespace PasswordGenerator
 
 					// tracks length of generated string
 					if (!bSkip && !Regex.IsMatch(c.ToString(), @"[\(\)\[\]]"))
-						index++;
+						literalCount++;
 
 					// removes brackets for character literals
 					if (Regex.IsMatch(pad, @"\[.\]"))
@@ -187,7 +220,7 @@ namespace PasswordGenerator
 		/// Creates a new string by discarding the first character of [toCycle]
 		/// and appending [end].
 		/// </summary>
-		private string Cycle(string toCycle, char end)
+		private string CreateCycle(string toCycle, char end)
 		{
 			if (toCycle.Length < 3)
 				return toCycle + end;

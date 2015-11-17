@@ -15,14 +15,11 @@ namespace PasswordGenerator
 		//private CustomRegEx regex;
 		private bool bAllowKey;
 
-		private bool[] lastRun, currentRun;
 		private bool bFirstRun = true;
 
 		public GeneratorForm()
 		{
 			InitializeComponent();
-			//regex = new CustomRegEx();
-			lastRun = currentRun;
 		}
 
 		private void trkLength_Scroll(object sender, EventArgs e)
@@ -57,7 +54,7 @@ namespace PasswordGenerator
 
 				LengthChanged(toVal);
 			}
-			catch (Exception ex)
+			catch (Exception)
 			{
 				LengthChanged(trkLength.Value);
 			}
@@ -89,6 +86,8 @@ namespace PasswordGenerator
 				bAllowKey = false;
 
 			AllowModKeys(e);
+
+			e.SuppressKeyPress = !bAllowKey;
 		}
 
 		/// <summary>
@@ -125,7 +124,6 @@ namespace PasswordGenerator
 
 			lstHistory.Items.Insert(0, result);
 
-			lastRun = currentRun;
 			bFirstRun = false;
 		}
 
